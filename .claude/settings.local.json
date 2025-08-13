@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 30 curl -s http://localhost:4001/scrape/status)",
+      "Bash(npm run build:*)",
+      "Bash(node:*)",
+      "WebFetch(domain:www.dijipin.com)",
+      "WebFetch(domain:www.dijipin.com)",
+      "WebFetch(domain:www.oyunfor.com)",
+      "WebFetch(domain:www.oyunfor.com)"
+    ],
+    "deny": []
+  }
+}

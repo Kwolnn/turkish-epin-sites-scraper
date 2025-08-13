@@ -1,0 +1,329 @@
+import { ScrapingResult, SiteConfig } from '../types';
+import { extractDomain } from '../utils/helpers';
+
+// All domains use Puppeteer now - no more static/axios scraping
+const PUPPETEER_REQUIRED_DOMAINS = new Set([
+  'epindigital.com', 'turkpin.com', 'oyunone.com', 'playsultan.com', 'epinsultan.com',
+  'foxepin.com', 'perdigital.com', 'kopazar.com', 'vatangame.com', 'mtcgame.com',
+  'bursagb.com', 'liderepin.com', 'oyuneks.com', 'dijipin.com', 'itemsatis.com',
+  'inovapin.com', 'bynogame.com', 'gamesatis.com', 'hesap.com.tr', 's2gepin.com',
+  'hi2games.com', 'oyunfor.com'
+]);
+
+// No more axios-friendly domains - everything uses Puppeteer
+const AXIOS_FRIENDLY_DOMAINS = new Set();
+
+// Site configurations for different domains with exact selectors
+const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
+  'epindigital.com': {
+    name: 'EpinDigital',
+    domain: 'epindigital.com',
+    selectors: {
+      container: 'div.product-item',
+      title: 'h3.product-name.d-block',
+      price: 'div.product-price, div.sales-price.fw-600.fs-18',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h3.product-name',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'turkpin.com': {
+    name: 'TurkPin',
+    domain: 'turkpin.com',
+    selectors: {
+      container: 'tr',
+      title: 'h5, div.product__description, div.short_desc',
+      price: 'td.bold',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h5',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'oyunone.com': {
+    name: 'OyunOne',
+    domain: 'oyunone.com',
+    selectors: {
+      container: 'div.item',
+      title: 'div.text1',
+      price: 'div.price notranslate, div.new_price.ng-binding',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'div.text1',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'playsultan.com': {
+    name: 'PlaySultan',
+    domain: 'playsultan.com',
+    selectors: {
+      container: 'a div.product_item, div.product_item',
+      title: 'h5',
+      price: 'span.fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'div.product_item',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'epinsultan.com': {
+    name: 'EpinSultan',
+    domain: 'epinsultan.com',
+    selectors: {
+      container: 'a div.product_item, div.product_item',
+      title: 'h5',
+      price: 'span.fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'div.product_item',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'foxepin.com': {
+    name: 'FoxEpin',
+    domain: 'foxepin.com',
+    selectors: {
+      container: '.product-item, .product-card',
+      title: 'h3.product-name.d-block',
+      price: 'div.product-price',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h3.product-name',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'perdigital.com': {
+    name: 'PerDigital',
+    domain: 'perdigital.com',
+    selectors: {
+      container: 'tr, .product-row, .product',
+      title: 'td.text-center, .product-name, .title',
+      price: 'span.text-center.semi-bold, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'tr',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'kopazar.com': {
+    name: 'Kopazar',
+    domain: 'kopazar.com',
+    selectors: {
+      container: 'div.col-12 div.card div.list-items',
+      title: 'a strong',
+      price: 'div.d-flex.align-items-center.justify-content-end strong',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'div.card',
+    delay: 1500,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'vatangame.com': {
+    name: 'VatanGame',
+    domain: 'vatangame.com',
+    selectors: {
+      container: '.card, div.card, [class*="card"], div.row, .row, [class*="row"], div.col, .product, .item',
+      title: 'p, span, div, h1, h2, h3, h4, h5, a, strong, [class*="font-bold"], [class*="title"]',
+      price: 'p, span, div, strong, [class*="font-bold"], [class*="price"], [class*="fiyat"], [style*="font-size"]',
+      originalPrice: '[style*="line-through"], .old-price, [class*="old"]'
+    },
+    waitFor: 'body',
+    delay: 5000,
+    maxRetries: 5,
+    requiresJS: true
+  },
+  'mtcgame.com': {
+    name: 'MTCGame',
+    domain: 'mtcgame.com',
+    selectors: {
+      container: '.product-card, .game-card',
+      title: 'div.flex-1.max-w-[15rem]',
+      price: 'div.text-right bg-[#7CFF6B33] rounded p-1',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h3.text-white',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'bursagb.com': {
+    name: 'BursaGB',
+    domain: 'bursagb.com',
+    selectors: {
+      container: '.product-item, .product-card, tr, .product',
+      title: 'h3.product-name.d-block, h3.product-name, .title',
+      price: 'div.product-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'liderepin.com': {
+    name: 'LiderEpin',
+    domain: 'liderepin.com',
+    selectors: {
+      container: '.product-item, .product, tr',
+      title: 'h3.product-name.d-block, h3.product-name, .title',
+      price: 'div.product-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'oyuneks.com': {
+    name: 'OyunEks',
+    domain: 'oyuneks.com',
+    selectors: {
+      container: 'div.productListHorizontalDetail',
+      title: 'div.productListHorizontalDetail',
+      price: 'div.productListHorizontalDetail',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'div.productListHorizontalDetail',
+    delay: 1500,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'dijipin.com': {
+    name: 'DijiPin',
+    domain: 'dijipin.com',
+    selectors: {
+      container: '.product-item, .product, tr',
+      title: 'h3.product-name.d-block, h3.product-name, .title',
+      price: 'div.sales-price.fw-600.fs-18, .sales-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'itemsatis.com': {
+    name: 'ItemSatis',
+    domain: 'itemsatis.com',
+    selectors: {
+      container: '.product-item',
+      title: 'h3.text-base.font-medium.!text-white',
+      price: 'div.text-2xl.font-medium.text-[#ffd679]',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h3.text-base',
+    delay: 1000,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'inovapin.com': {
+    name: 'InovaPin',
+    domain: 'inovapin.com',
+    selectors: {
+      container: '.product-item, .product, tr',
+      title: 'h3.product-name.d-block, h3.product-name, .title',
+      price: 'div.product-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'bynogame.com': {
+    name: 'BynoGame',
+    domain: 'bynogame.com',
+    selectors: {
+      container: '.product-item',
+      title: 'h2.font-weight-bolder.text-left',
+      price: 'div.col-lg-4.col-md-5',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'h2.font-weight-bolder',
+    delay: 1500,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'gamesatis.com': {
+    name: 'GameSatis',
+    domain: 'gamesatis.com',
+    selectors: {
+      container: '.product-item, .product, tr',
+      title: 'h3, .title, .product-name',
+      price: 'div.selling-price, .selling-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'hesap.com.tr': {
+    name: 'HesapComTr',
+    domain: 'hesap.com.tr',
+    selectors: {
+      container: '.product-item',
+      title: 'a.d-flex',
+      price: 'div#newprice_lg282.new',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'a.d-flex',
+    delay: 1500,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  's2gepin.com': {
+    name: 'S2GEpin',
+    domain: 's2gepin.com',
+    selectors: {
+      container: '.product-item, .product, tr',
+      title: 'h3.product-name.d-block, h3.product-name, .title',
+      price: 'div.product-price, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.product-item',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  },
+  'hi2games.com': {
+    name: 'Hi2Games',
+    domain: 'hi2games.com',
+    selectors: {
+      container: '.product-item',
+      title: 'p.text-header',
+      price: 'p.text-header.current',
+      originalPrice: '.old-price'
+    },
+    waitFor: 'p.text-header',
+    delay: 1500,
+    maxRetries: 2,
+    requiresJS: true
+  },
+  'oyunfor.com': {
+    name: 'OyunFor',
+    domain: 'oyunfor.com',
+    selectors: {
+      container: '.product-item, .productBox, tr, .product',
+      title: 'h3.productText, h3, .title, .product-name',
+      price: 'div.notranslate, .price, .fiyat',
+      originalPrice: '.old-price'
+    },
+    waitFor: '.productBox',
+    delay: 1500,
+    maxRetries: 3,
+    requiresJS: true
+  }
+};
+
+
+export { PUPPETEER_REQUIRED_DOMAINS, AXIOS_FRIENDLY_DOMAINS, SITE_CONFIGS };
