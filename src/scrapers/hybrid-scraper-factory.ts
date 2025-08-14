@@ -150,12 +150,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'MTCGame',
     domain: 'mtcgame.com',
     selectors: {
-      container: '.product-card, .game-card',
-      title: 'div.flex-1.max-w-[15rem]',
-      price: 'div.text-right bg-[#7CFF6B33] rounded p-1',
+      container: 'a.border-2.border-amber-600\\/10',
+      title: 'h3.text-white.font-medium.text-sm.line-clamp-2',
+      price: 'div.text-right.bg-\\[\\#7CFF6B33\\] p.text-sm.font-medium.text-white',
       originalPrice: '.old-price'
     },
-    waitFor: 'h3.text-white',
+    waitFor: 'a.border-2.border-amber-600\\/10',
     delay: 1000,
     maxRetries: 2,
     requiresJS: true
@@ -220,12 +220,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'ItemSatis',
     domain: 'itemsatis.com',
     selectors: {
-      container: '.product-item',
-      title: 'h3.text-base.font-medium.!text-white',
-      price: 'div.text-2xl.font-medium.text-[#ffd679]',
-      originalPrice: '.old-price'
+      container: 'div.relative.border.rounded-lg',
+      title: 'h3.text-base.font-medium.\\!text-white',
+      price: 'div.text-2xl.font-medium.text-\\[\\#ffd679\\]',
+      originalPrice: 'div.text-base.line-through.text-gray-400'
     },
-    waitFor: 'h3.text-base',
+    waitFor: 'div.relative.border.rounded-lg',
     delay: 1000,
     maxRetries: 2,
     requiresJS: true
@@ -234,12 +234,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'InovaPin',
     domain: 'inovapin.com',
     selectors: {
-      container: '.product-item, .product, tr',
+      container: 'div.col-lg-6.col-md-6.col-xs-12.col-12.product-base',
       title: 'h3.product-name.d-block, h3.product-name, .title',
-      price: 'div.product-price, .price, .fiyat',
+      price: 'div.sales-price.fw-600.fs-18',
       originalPrice: '.old-price'
     },
-    waitFor: '.product-item',
+    waitFor: 'div.col-lg-6.col-md-6.col-xs-12.col-12.product-base',
     delay: 1500,
     maxRetries: 3,
     requiresJS: true
@@ -248,12 +248,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'BynoGame',
     domain: 'bynogame.com',
     selectors: {
-      container: '.product-item',
+      container: 'div.itemCard',
       title: 'h2.font-weight-bolder.text-left',
       price: 'div.col-lg-4.col-md-5',
       originalPrice: '.old-price'
     },
-    waitFor: 'h2.font-weight-bolder',
+    waitFor: 'div.itemCard',
     delay: 1500,
     maxRetries: 2,
     requiresJS: true
@@ -262,12 +262,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'GameSatis',
     domain: 'gamesatis.com',
     selectors: {
-      container: '.product-item, .product, tr',
-      title: 'h3, .title, .product-name',
-      price: 'div.selling-price, .selling-price, .price, .fiyat',
-      originalPrice: '.old-price'
+      container: 'a.product',
+      title: 'h3',
+      price: 'div.selling-price',
+      originalPrice: 'div.original-price'
     },
-    waitFor: '.product-item',
+    waitFor: 'a.product',
     delay: 1500,
     maxRetries: 3,
     requiresJS: true
@@ -276,12 +276,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'HesapComTr',
     domain: 'hesap.com.tr',
     selectors: {
-      container: '.product-item',
+      container: 'li.col-12.prd',
       title: 'a.d-flex',
       price: 'div#newprice_lg282.new',
       originalPrice: '.old-price'
     },
-    waitFor: 'a.d-flex',
+    waitFor: 'li.col-12.prd',
     delay: 1500,
     maxRetries: 2,
     requiresJS: true
@@ -304,12 +304,12 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'Hi2Games',
     domain: 'hi2games.com',
     selectors: {
-      container: '.product-item',
-      title: 'p.text-header',
-      price: 'p.text-header.current',
-      originalPrice: '.old-price'
+      container: 'div.table-container.product',
+      title: 'div.table-item.name p.text-header:first-child',
+      price: 'div.table-item.price p.text-header.current',
+      originalPrice: 'div.table-item.price p.text-header.old'
     },
-    waitFor: 'p.text-header',
+    waitFor: 'div.table-container.product',
     delay: 1500,
     maxRetries: 2,
     requiresJS: true

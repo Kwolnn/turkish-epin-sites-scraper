@@ -25,6 +25,7 @@ const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://n8n:5678/webhook/ga
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // CORS for development
 app.use((req, res, next) => {
@@ -100,6 +101,9 @@ app.post('/scrape/sync', async (req, res) => {
       })));
 
     console.log(`✅ Scraping completed: ${scrapedItems.length} items from ${result.successCount}/${result.totalUrls} URLs`);
+
+    // Update dashboard items
+    dashboardItems = scrapedItems;
 
     // Return scraped data immediately
     return res.json({
@@ -419,247 +423,69 @@ app.get('/config/rate-limit', (req, res) => {
   });
 });
 
-// Simple frontend for testing
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>🎮 Game Price Scraper</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
-            .container { background: #f5f5f5; padding: 20px; border-radius: 10px; }
-            button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
-            button:hover { background: #0056b3; }
-            .status { margin: 20px 0; padding: 10px; border-radius: 5px; }
-            .success { background: #d4edda; color: #155724; }
-            .error { background: #f8d7da; color: #721c24; }
-            .info { background: #d1ecf1; color: #0c5460; }
-            .progress { background: #fff3cd; color: #856404; }
-            .progress-bar { 
-                width: 100%; 
-                height: 20px; 
-                background: #e9ecef; 
-                border-radius: 10px; 
-                overflow: hidden; 
-                margin: 10px 0;
-            }
-            .progress-fill { 
-                height: 100%; 
-                background: linear-gradient(45deg, #007bff, #0056b3); 
-                transition: width 0.3s ease;
-                border-radius: 10px;
-            }
-            .loading { 
-                display: inline-block; 
-                animation: spin 1s linear infinite; 
-            }
-            @keyframes spin { 
-                0% { transform: rotate(0deg); } 
-                100% { transform: rotate(360deg); } 
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🎮 Game Price Scraper</h1>
-            <p>Oyun parası fiyatlarını otomatik olarak tarayan sistem</p>
-            
-            <div>
-                <button onclick="startScraping()">🚀 Start Scraping</button>
-                <button onclick="testN8N()">🔗 Test N8N</button>
-                <button onclick="checkStatus()">📊 Check Status</button>
-                <button onclick="getDomains()">🌐 Get Domains</button>
-                <button onclick="getLatestPrices()">💰 Latest Prices</button>
-                <button onclick="getFailedUrls()">❌ Failed URLs</button>
-                <button onclick="getLastResult()">📋 Last Result</button>
-            </div>
-            
-            <div id="status"></div>
-            <div id="results"></div>
-        </div>
+// Store scraped items for dashboard
+let dashboardItems: any[] = [];
 
-        <script>
-            let progressInterval = null;
-
-            function showStatus(message, type = 'info') {
-                const statusDiv = document.getElementById('status');
-                statusDiv.innerHTML = \`<div class="status \${type}">\${message}</div>\`;
-            }
-
-            function showProgress(percentage, message) {
-                const statusDiv = document.getElementById('status');
-                statusDiv.innerHTML = \`
-                    <div class="status progress">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span class="loading">⟳</span>
-                            <span>\${message}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: \${percentage}%"></div>
-                        </div>
-                        <div style="text-align: center; font-size: 12px;">\${percentage}%</div>
-                    </div>
-                \`;
-            }
-
-            function showResults(data) {
-                const resultsDiv = document.getElementById('results');
-                resultsDiv.innerHTML = \`<pre>\${JSON.stringify(data, null, 2)}</pre>\`;
-            }
-
-            function startProgressMonitoring() {
-                if (progressInterval) clearInterval(progressInterval);
-                progressInterval = setInterval(async () => {
-                    try {
-                        const response = await fetch('/scrape/status');
-                        const data = await response.json();
-                        
-                        if (data.isRunning) {
-                            const progress = data.progressPercentage || data.progress || 0;
-                            const processed = data.processedUrls || 0;
-                            const total = data.totalUrls || 0;
-                            
-                            if (total > 0) {
-                                showProgress(progress, \`Scraping URLs: \${processed}/\${total}\`);
-                            } else {
-                                showProgress(progress, 'Initializing scraper...');
-                            }
-                        } else {
-                            clearInterval(progressInterval);
-                            progressInterval = null;
-                            
-                            if (data.progress === 100) {
-                                showStatus(\`✅ Scraping completed! \${data.totalItems || 0} items scraped\`, 'success');
-                            } else if (data.progress === -1) {
-                                showStatus('❌ Scraping failed', 'error');
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Progress monitoring error:', error);
-                    }
-                }, 1000);
-            }
-
-            async function startScraping() {
-                showStatus('🚀 Starting scraping job...', 'info');
-                try {
-                    const response = await fetch('/scrape/start', { 
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        if (data.isRunning) {
-                            // Already running - show current progress
-                            const progress = data.progress || 0;
-                            showProgress(progress, data.message);
-                            startProgressMonitoring();
-                        } else {
-                            // Just started - begin monitoring
-                            showStatus('✅ ' + data.message, 'success');
-                            startProgressMonitoring();
-                        }
-                    } else {
-                        showStatus(\`❌ Scraping failed: \${data.error}\`, 'error');
-                    }
-                    showResults(data);
-                } catch (error) {
-                    showStatus(\`❌ Error: \${error.message}\`, 'error');
-                }
-            }
-
-            async function testN8N() {
-                showStatus('🔗 Testing N8N connection...', 'info');
-                try {
-                    const response = await fetch('/test/n8n');
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        showStatus('✅ N8N connection successful!', 'success');
-                    } else {
-                        showStatus(\`❌ N8N connection failed: \${data.error}\`, 'error');
-                    }
-                    showResults(data);
-                } catch (error) {
-                    showStatus(\`❌ Error: \${error.message}\`, 'error');
-                }
-            }
-
-            async function checkStatus() {
-                showStatus('📊 Checking status...', 'info');
-                try {
-                    const response = await fetch('/scrape/status');
-                    const data = await response.json();
-                    showStatus('✅ Status retrieved!', 'success');
-                    showResults(data);
-                } catch (error) {
-                    showStatus(\`❌ Error: \${error.message}\`, 'error');
-                }
-            }
-
-            async function getDomains() {
-                showStatus('🌐 Getting supported domains...', 'info');
-                try {
-                    const response = await fetch('/domains');
-                    const data = await response.json();
-                    showStatus(\`✅ Found \${data.count} supported domains!\`, 'success');
-                    showResults(data);
-                } catch (error) {
-                    showStatus(\`❌ Error: \${error.message}\`, 'error');
-                }
-            }
-
-            async function getLatestPrices() {
-                showStatus('💰 Getting latest prices...', 'info');
-                try {
-                    const response = await fetch('/api/prices/latest');
-                    const data = await response.json();
-                    showStatus('✅ Found ' + data.total + ' price records!', 'success');
-                    showResults(data);
-                } catch (error) {
-                    showStatus('❌ Error: ' + error.message, 'error');
-                }
-            }
-
-            async function getFailedUrls() {
-                showStatus('❌ Getting failed URLs...', 'info');
-                try {
-                    const response = await fetch('/scrape/failed-urls');
-                    const data = await response.json();
-                    if (data.count > 0) {
-                        showStatus('❌ Found ' + data.count + ' failed URLs', 'error');
-                    } else {
-                        showStatus('✅ No failed URLs in last scraping job', 'success');
-                    }
-                    showResults(data);
-                } catch (error) {
-                    showStatus('❌ Error: ' + error.message, 'error');
-                }
-            }
-
-            async function getLastResult() {
-                showStatus('📋 Getting last batch result...', 'info');
-                try {
-                    const response = await fetch('/scrape/last-result');
-                    const data = await response.json();
-                    if (data.success) {
-                        const result = data.result;
-                        showStatus('📋 Last batch: ' + result.batchId + ' (' + result.totalItems + ' items)', 'success');
-                    } else {
-                        showStatus('📋 No batch results available', 'info');
-                    }
-                    showResults(data);
-                } catch (error) {
-                    showStatus('❌ Error: ' + error.message, 'error');
-                }
-            }
-        </script>
-    </body>
-    </html>
-  `);
+// Modern dashboard endpoint
+app.get('/api/dashboard/items', (req, res) => {
+  const { search, sortBy, sortOrder, minPrice, maxPrice } = req.query;
+  
+  let filteredItems = [...dashboardItems];
+  
+  // Search filter
+  if (search) {
+    const searchTerm = search.toString().toLowerCase();
+    filteredItems = filteredItems.filter(item => 
+      item.title.toLowerCase().includes(searchTerm) ||
+      item.siteName.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  // Price filter
+  if (minPrice || maxPrice) {
+    filteredItems = filteredItems.filter(item => {
+      const price = parseFloat(item.price.replace(/[^\d.,]/g, '').replace(',', '.'));
+      if (minPrice && price < parseFloat(minPrice.toString())) return false;
+      if (maxPrice && price > parseFloat(maxPrice.toString())) return false;
+      return true;
+    });
+  }
+  
+  // Sort
+  if (sortBy) {
+    filteredItems.sort((a, b) => {
+      let aVal, bVal;
+      
+      if (sortBy === 'price') {
+        aVal = parseFloat(a.price.replace(/[^\d.,]/g, '').replace(',', '.'));
+        bVal = parseFloat(b.price.replace(/[^\d.,]/g, '').replace(',', '.'));
+      } else if (sortBy === 'title') {
+        aVal = a.title.toLowerCase();
+        bVal = b.title.toLowerCase();
+      } else if (sortBy === 'siteName') {
+        aVal = a.siteName.toLowerCase();
+        bVal = b.siteName.toLowerCase();
+      } else {
+        return 0;
+      }
+      
+      if (sortOrder === 'desc') {
+        return bVal > aVal ? 1 : -1;
+      } else {
+        return aVal > bVal ? 1 : -1;
+      }
+    });
+  }
+  
+  res.json({
+    success: true,
+    items: filteredItems,
+    total: filteredItems.length,
+    timestamp: new Date().toISOString()
+  });
 });
+
+// Serve static files (dashboard served from public/index.html)
 
 app.listen(port, () => {
   console.log(`✅ Backend up on http://localhost:${port}`);

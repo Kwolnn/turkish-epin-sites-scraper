@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🎮 Game Price Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #4facfe 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 3rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .header h1 {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2rem;
+            font-weight: 300;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem;
+            border-radius: 20px;
+            margin-bottom: 3rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .controls:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .form-group input,
+        .form-group select {
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: rgba(255, 255, 255, 0.9);
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.95);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem 1.5rem;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.95);
+            display: block;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .item-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-left: 4px solid #667eea;
+        }
+        
+        .item-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        
+        .item-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            line-height: 1.3;
+        }
+        
+        .item-price {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #4facfe;
+            margin-bottom: 0.5rem;
+        }
+        
+        .item-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .item-site {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            margin: 2rem 0;
+        }
+        
+        .empty-state h3 {
+            color: #666;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+        }
+        
+        .notification.error {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+            .control-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .items-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 Game Price Dashboard</h1>
+        <p>Advanced gaming price monitoring system</p>
+    </div>
+    
+    <div class="container">
+        <div class="controls">
+            <div class="control-grid">
+                <div class="form-group">
+                    <label>🔍 Search</label>
+                    <input type="text" id="searchInput" placeholder="Search products or sites...">
+                </div>
+                
+                <div class="form-group">
+                    <label>📊 Sort By</label>
+                    <select id="sortSelect">
+                        <option value="price-asc">Price (Low → High)</option>
+                        <option value="price-desc">Price (High → Low)</option>
+                        <option value="title-asc">Name (A → Z)</option>
+                        <option value="title-desc">Name (Z → A)</option>
+                        <option value="siteName-asc">Site (A → Z)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>💰 Min Price</label>
+                    <input type="number" id="minPrice" placeholder="0">
+                </div>
+                
+                <div class="form-group">
+                    <label>💰 Max Price</label>
+                    <input type="number" id="maxPrice" placeholder="1000">
+                </div>
+                
+                <div class="form-group">
+                    <label style="opacity: 0;">Actions</label>
+                    <div>
+                        <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <span class="stat-number" id="totalItems">0</span>
+                <div class="stat-label">Total Products</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="uniqueSites">0</span>
+                <div class="stat-label">Unique Sites</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="avgPrice">₺0</span>
+                <div class="stat-label">Average Price</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="lastUpdate">-</span>
+                <div class="stat-label">Last Updated</div>
+            </div>
+        </div>
+        
+        <div id="itemsContainer"></div>
+    </div>
+    
+    <script>
+        let allItems = [];
+        let filteredItems = [];
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshData();
+            
+            // Event listeners
+            document.getElementById('searchInput').addEventListener('input', filterItems);
+            document.getElementById('sortSelect').addEventListener('change', filterItems);
+            document.getElementById('minPrice').addEventListener('input', filterItems);
+            document.getElementById('maxPrice').addEventListener('input', filterItems);
+        });
+        
+        async function refreshData() {
+            try {
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/dashboard/items?_t=${timestamp}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allItems = data.items;
+                    filterItems();
+                    updateStats();
+                    showNotification('Data refreshed successfully!', 'success');
+                }
+            } catch (error) {
+                showNotification('Failed to load data: ' + error.message, 'error');
+            }
+        }
+        
+        function filterItems() {
+            const search = document.getElementById('searchInput').value;
+            const sort = document.getElementById('sortSelect').value;
+            const minPrice = document.getElementById('minPrice').value;
+            const maxPrice = document.getElementById('maxPrice').value;
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (minPrice) params.append('minPrice', minPrice);
+            if (maxPrice) params.append('maxPrice', maxPrice);
+            
+            const [sortBy, sortOrder] = sort.split('-');
+            params.append('sortBy', sortBy);
+            params.append('sortOrder', sortOrder);
+            
+            const timestamp = new Date().getTime();
+            params.append('_t', timestamp);
+            fetch(`/api/dashboard/items?${params}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        filteredItems = data.items;
+                        renderItems();
+                    }
+                })
+                .catch(error => console.error('Filter error:', error));
+        }
+        
+        function renderItems() {
+            const container = document.getElementById('itemsContainer');
+            
+            if (filteredItems.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>🔍 No Products Found</h3>
+                        <p>Try adjusting your search criteria or filters.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const itemsHTML = filteredItems.map(item => `
+                <div class="item-card">
+                    <div class="item-title">${item.title}</div>
+                    <div class="item-price">${item.price}</div>
+                    <div class="item-meta">
+                        <span class="item-site">${item.siteName}</span>
+                        <span>${item.currency} • ${item.region}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `<div class="items-grid">${itemsHTML}</div>`;
+        }
+        
+        function updateStats() {
+            const totalItems = allItems.length;
+            const uniqueSites = new Set(allItems.map(item => item.siteName)).size;
+            
+            const prices = allItems.map(item => {
+                const price = parseFloat(item.price.replace(/[^\\d.,]/g, '').replace(',', '.'));
+                return isNaN(price) ? 0 : price;
+            }).filter(price => price > 0);
+            
+            const avgPrice = prices.length > 0 
+                ? (prices.reduce((sum, price) => sum + price, 0) / prices.length).toFixed(2)
+                : 0;
+            
+            document.getElementById('totalItems').textContent = totalItems;
+            document.getElementById('uniqueSites').textContent = uniqueSites;
+            document.getElementById('avgPrice').textContent = `₺${avgPrice}`;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('tr-TR');
+        }
+        
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Auto refresh every 30 seconds
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>
