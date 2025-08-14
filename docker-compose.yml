@@ -11,6 +11,8 @@ services:
     depends_on:
       n8n:
         condition: service_healthy
+      flaresolverr:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT}/health || exit 1"]
       interval: 30s
@@ -49,10 +51,10 @@ services:
     env_file:
       - .env
     environment:
-      N8N_HOST: 8bce282bc994.ngrok-free.app
+      N8N_HOST: bb1c8a727adc.ngrok-free.app
       N8N_PORT: 5678
       N8N_PROTOCOL: https
-      WEBHOOK_URL: https://8bce282bc994.ngrok-free.app
+      WEBHOOK_URL: https://bb1c8a727adc.ngrok-free.app
       N8N_BASIC_AUTH_ACTIVE: true
       N8N_BASIC_AUTH_USER: efece2011@gmail.com
       N8N_BASIC_AUTH_PASSWORD: Megan2004
@@ -69,6 +71,31 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+    networks:
+      - appnet
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - BROWSER_TIMEOUT=180000
+      - HEADLESS=true
+      - TEST_URL=https://www.google.com
+    shm_size: 2gb
+    volumes:
+      - /dev/shm:/dev/shm
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8191/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - appnet
 

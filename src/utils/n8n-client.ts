@@ -5,12 +5,19 @@ export class N8NClient {
   private webhookUrl: string;
   private timeout: number = 10000;
   private maxRetries: number = 1;
+  private enableWebhook: boolean;
 
   constructor(webhookUrl: string) {
     this.webhookUrl = webhookUrl;
+    this.enableWebhook = (process.env.ENABLE_N8N_WEBHOOK || 'false').toLowerCase() === 'true';
   }
 
   async sendBatchData(batchResult: BatchResult): Promise<boolean> {
+    // Check if webhook is enabled
+    if (!this.enableWebhook) {
+      console.log(`⚠️ N8N webhook is disabled (ENABLE_N8N_WEBHOOK=false), skipping data send`);
+      return true;
+    }
     try {
       // Convert ScrapedItems to ScrapedPrices
       const prices: ScrapedPrice[] = [];
@@ -124,6 +131,12 @@ export class N8NClient {
   }
 
   async testConnection(): Promise<boolean> {
+    // Only test connection if webhook is enabled
+    if (!this.enableWebhook) {
+      console.log(`⚠️ N8N webhook is disabled, skipping connection test`);
+      return true;
+    }
+
     try {
       const testPayload: N8NWebhookPayload = {
         batchId: 'test_connection',

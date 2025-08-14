@@ -1,16 +1,21 @@
 import { ScrapingResult, SiteConfig } from '../types';
 import { extractDomain } from '../utils/helpers';
 
-// All domains use Puppeteer now - no more static/axios scraping
+// Domains that require FlareSolverr for Cloudflare bypass
+const FLARESOLVERR_REQUIRED_DOMAINS = new Set([
+  'oyuneks.com', 'liderepin.com'  // Only these domains use FlareSolverr
+]);
+
+// Domains that work well with Puppeteer
 const PUPPETEER_REQUIRED_DOMAINS = new Set([
   'epindigital.com', 'turkpin.com', 'oyunone.com', 'playsultan.com', 'epinsultan.com',
   'foxepin.com', 'perdigital.com', 'kopazar.com', 'vatangame.com', 'mtcgame.com',
-  'bursagb.com', 'liderepin.com', 'oyuneks.com', 'dijipin.com', 'itemsatis.com',
+  'bursagb.com', 'itemsatis.com', 'dijipin.com', 'oyunfor.com',
   'inovapin.com', 'bynogame.com', 'gamesatis.com', 'hesap.com.tr', 's2gepin.com',
-  'hi2games.com', 'oyunfor.com'
+  'hi2games.com'
 ]);
 
-// No more axios-friendly domains - everything uses Puppeteer
+// No more axios-friendly domains - everything uses Puppeteer or FlareSolverr
 const AXIOS_FRIENDLY_DOMAINS = new Set();
 
 // Site configurations for different domains with exact selectors
@@ -187,14 +192,14 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
     name: 'OyunEks',
     domain: 'oyuneks.com',
     selectors: {
-      container: 'div.productListHorizontalDetail',
-      title: 'div.productListHorizontalDetail',
-      price: 'div.productListHorizontalDetail',
+      container: 'button.productListHorizontal.detailProductButton, .productListHorizontal',
+      title: 'div.productListHorizontalDetailTitle, .productListHorizontalDetailTitle',
+      price: 'div.productListHorizontalDetailPrice, .productListHorizontalDetailPrice',
       originalPrice: '.old-price'
     },
-    waitFor: 'div.productListHorizontalDetail',
-    delay: 1500,
-    maxRetries: 2,
+    waitFor: '.productListHorizontal',
+    delay: 3000,
+    maxRetries: 3,
     requiresJS: true
   },
   'dijipin.com': {
@@ -326,4 +331,4 @@ const SITE_CONFIGS: { [domain: string]: SiteConfig } = {
 };
 
 
-export { PUPPETEER_REQUIRED_DOMAINS, AXIOS_FRIENDLY_DOMAINS, SITE_CONFIGS };
+export { FLARESOLVERR_REQUIRED_DOMAINS, PUPPETEER_REQUIRED_DOMAINS, AXIOS_FRIENDLY_DOMAINS, SITE_CONFIGS };

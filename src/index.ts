@@ -48,7 +48,87 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Start scraping endpoint
+// Synchronous scraping endpoint for N8N integration
+app.post('/scrape/sync', async (req, res) => {
+  try {
+    console.log('🚀 Starting synchronous scraping for N8N...');
+    
+    // Extract URLs from request body
+    const { urls } = req.body;
+    
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'URLs array is required in request body'
+      });
+    }
+
+    // Validate URLs
+    const validUrls = urls.filter((url: any) => 
+      typeof url === 'string' && url.startsWith('http')
+    );
+
+    if (validUrls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid URLs provided'
+      });
+    }
+
+    console.log(`📝 Processing ${validUrls.length} URLs synchronously...`);
+
+    // Initialize orchestrator
+    const orchestrator = new HttpOrchestrator(n8nWebhookUrl);
+    await orchestrator.initialize();
+    
+    // Run synchronous scraping
+    const result = await orchestrator.scrapeUrls(validUrls);
+    
+    await orchestrator.close();
+    
+    // Prepare response data
+    const scrapedItems = result.results
+      .filter(r => r.success && r.items.length > 0)
+      .flatMap(r => r.items.map(item => ({
+        title: item.title,
+        price: item.price,
+        currency: item.currency,
+        region: item.region,
+        url: item.url,
+        siteName: item.siteName,
+        gameSlug: item.gameSlug
+      })));
+
+    console.log(`✅ Scraping completed: ${scrapedItems.length} items from ${result.successCount}/${result.totalUrls} URLs`);
+
+    // Return scraped data immediately
+    return res.json({
+      success: true,
+      message: 'Scraping completed successfully',
+      data: {
+        batchId: result.batchId,
+        timestamp: result.timestamp.toISOString(),
+        summary: {
+          totalUrls: result.totalUrls,
+          successCount: result.successCount,
+          failedCount: result.failedCount,
+          totalItems: scrapedItems.length
+        },
+        items: scrapedItems,
+        errors: result.errors
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Synchronous scraping failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Asynchronous scraping endpoint (original)
 app.post('/scrape/start', async (req, res) => {
   try {
     // Check if already running - return current progress instead of error
@@ -71,7 +151,7 @@ app.post('/scrape/start', async (req, res) => {
       });
     }
 
-    console.log('🚀 Starting scraping job...');
+    console.log('🚀 Starting async scraping job...');
     
     // Reset status and failed URLs
     scrapingStatus = {

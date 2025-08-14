@@ -1,9 +1,10 @@
 import fs from 'fs/promises';
 import { PuppeteerScraper } from './scrapers/puppeteer-scraper';
-import { SITE_CONFIGS } from './scrapers/hybrid-scraper-factory';
+import { FlareSolverrScraper } from './scrapers/flaresolverr-scraper';
+import { SITE_CONFIGS, FLARESOLVERR_REQUIRED_DOMAINS } from './scrapers/hybrid-scraper-factory';
 import { N8NClient } from './utils/n8n-client';
 import { BatchResult, ScrapingResult, SiteConfig } from './types';
-import { generateBatchId, randomDelay, extractDomain } from './utils/helpers';
+import { generateBatchId, extractDomain } from './utils/helpers';
 
 export class HttpOrchestrator {
   private n8nClient: N8NClient;
@@ -82,37 +83,31 @@ export class HttpOrchestrator {
   private async scrapeUrlHttp(url: string, index: number, total: number): Promise<ScrapingResult> {
     const domain = extractDomain(url);
     console.log(`🌐 [${index}/${total}] HTTP scraping ${domain}...`);
-    
-    // Rate limiting per domain
-    await this.waitForDomainRateLimit(domain);
-    
-    try {
-      // Get site configuration
+  
+     try {
       const config = SITE_CONFIGS[domain] || this.getGenericConfig(domain);
-      
-      // Use Puppeteer for ALL domains now
-      console.log(`🎭 Using PUPPETEER scraper for ${domain}`);
-      const scraper = new PuppeteerScraper(config);
-      const result = await scraper.scrapeUrl(url);
-      
-      // Close scraper after each use to save memory
-      await scraper.close();
-      
-      const status = result.success ? '✅' : '❌';
-      const itemCount = result.items.length;
-      const responseTime = Math.round(result.responseTime);
-      
-      console.log(`   ${status} ${domain} - ${itemCount} items (${responseTime}ms)`);
-      
-      if (!result.success && result.error) {
-        console.log(`      Error: ${result.error}`);
+  
+      // 🔀 Domain'e göre seçim
+      if (FLARESOLVERR_REQUIRED_DOMAINS.has(domain)) {
+        console.log(`🛡️ Using FLARESOLVERR scraper for ${domain}`);
+        const scraper = new FlareSolverrScraper(config);
+        const result = await scraper.scrapeUrl(url);
+        const status = result.success ? '✅' : '❌';
+        console.log(`   ${status} ${domain} - ${result.items.length} items (${Math.round(result.responseTime)}ms)`);
+        if (!result.success && result.error) console.log(`      Error: ${result.error}`);
+        return result;
+      } else {
+        console.log(`🎭 Using PUPPETEER scraper for ${domain}`);
+        const scraper = new PuppeteerScraper(config);
+        const result = await scraper.scrapeUrl(url);
+        await scraper.close();
+        const status = result.success ? '✅' : '❌';
+        console.log(`   ${status} ${domain} - ${result.items.length} items (${Math.round(result.responseTime)}ms)`);
+        if (!result.success && result.error) console.log(`      Error: ${result.error}`);
+        return result;
       }
-      
-      return result;
-      
     } catch (error) {
       console.error(`   💥 ${domain} - Exception: ${error}`);
-      
       return {
         success: false,
         url,
