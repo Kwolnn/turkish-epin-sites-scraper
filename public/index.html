@@ -7,6 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <!-- Force cache bust: v2025081912 -->
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -179,58 +180,75 @@
             font-weight: 500;
         }
         
-        .items-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 1rem;
+        .items-list {
             margin-top: 2rem;
         }
         
-        .item-card {
+        .item-row {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            padding: 1rem 1.5rem;
+            margin-bottom: 0.8rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
             border-left: 4px solid #667eea;
-        }
-        
-        .item-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-        }
-        
-        .item-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 0.5rem;
-            line-height: 1.3;
-        }
-        
-        .item-price {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #4facfe;
-            margin-bottom: 0.5rem;
-        }
-        
-        .item-meta {
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        
+        .item-row:hover {
+            transform: translateX(5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 1);
+        }
+        
+        .item-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+        
+        .item-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            min-width: 200px;
+        }
+        
+        .item-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #4facfe;
+            min-width: 80px;
+        }
+        
+        .item-region {
             font-size: 0.9rem;
             color: #666;
+            min-width: 60px;
+        }
+        
+        .item-currency {
+            font-size: 0.9rem;
+            color: #666;
+            min-width: 40px;
         }
         
         .item-site {
             background: rgba(102, 126, 234, 0.1);
             color: #667eea;
-            padding: 0.2rem 0.6rem;
-            border-radius: 12px;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
+            min-width: 100px;
+            text-align: center;
         }
         
         .empty-state {
@@ -278,7 +296,8 @@
             .header { padding: 1rem; }
             .control-grid { grid-template-columns: 1fr; }
             .stats { grid-template-columns: repeat(2, 1fr); }
-            .items-grid { grid-template-columns: 1fr; }
+            .item-info { flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+            .item-title, .item-price, .item-region, .item-currency { min-width: auto; }
         }
     </style>
 </head>
@@ -299,6 +318,7 @@
                 <div class="form-group">
                     <label>📊 Sort By</label>
                     <select id="sortSelect">
+                        <option value="backend">Backend Order</option>
                         <option value="price-asc">Price (Low → High)</option>
                         <option value="price-desc">Price (High → Low)</option>
                         <option value="title-asc">Name (A → Z)</option>
@@ -334,10 +354,6 @@
             <div class="stat-card">
                 <span class="stat-number" id="uniqueSites">0</span>
                 <div class="stat-label">Unique Sites</div>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="avgPrice">₺0</span>
-                <div class="stat-label">Average Price</div>
             </div>
             <div class="stat-card">
                 <span class="stat-number" id="lastUpdate">-</span>
@@ -391,9 +407,12 @@
             if (minPrice) params.append('minPrice', minPrice);
             if (maxPrice) params.append('maxPrice', maxPrice);
             
-            const [sortBy, sortOrder] = sort.split('-');
-            params.append('sortBy', sortBy);
-            params.append('sortOrder', sortOrder);
+            // Backend order için sort parametresi gönderme
+            if (sort !== 'backend') {
+                const [sortBy, sortOrder] = sort.split('-');
+                params.append('sortBy', sortBy);
+                params.append('sortOrder', sortOrder);
+            }
             
             const timestamp = new Date().getTime();
             params.append('_t', timestamp);
@@ -422,35 +441,26 @@
             }
             
             const itemsHTML = filteredItems.map(item => `
-                <div class="item-card">
-                    <div class="item-title">${item.title}</div>
-                    <div class="item-price">${item.price}</div>
-                    <div class="item-meta">
-                        <span class="item-site">${item.siteName}</span>
-                        <span>${item.currency} • ${item.region}</span>
+                <a href="${item.url}" target="_blank" class="item-row">
+                    <div class="item-info">
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-price">${item.price}</div>
+                        <div class="item-region">${item.region || 'TR'}</div>
+                        <div class="item-currency">${item.currency || 'TRY'}</div>
                     </div>
-                </div>
+                    <div class="item-site">${item.siteName}</div>
+                </a>
             `).join('');
             
-            container.innerHTML = `<div class="items-grid">${itemsHTML}</div>`;
+            container.innerHTML = `<div class="items-list">${itemsHTML}</div>`;
         }
         
         function updateStats() {
             const totalItems = allItems.length;
             const uniqueSites = new Set(allItems.map(item => item.siteName)).size;
             
-            const prices = allItems.map(item => {
-                const price = parseFloat(item.price.replace(/[^\\d.,]/g, '').replace(',', '.'));
-                return isNaN(price) ? 0 : price;
-            }).filter(price => price > 0);
-            
-            const avgPrice = prices.length > 0 
-                ? (prices.reduce((sum, price) => sum + price, 0) / prices.length).toFixed(2)
-                : 0;
-            
             document.getElementById('totalItems').textContent = totalItems;
             document.getElementById('uniqueSites').textContent = uniqueSites;
-            document.getElementById('avgPrice').textContent = `₺${avgPrice}`;
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('tr-TR');
         }
         

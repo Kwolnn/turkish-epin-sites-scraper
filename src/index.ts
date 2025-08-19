@@ -184,6 +184,13 @@ app.post('/scrape/start', async (req, res) => {
     setImmediate(async () => {
       try {
         const orchestrator = new HttpOrchestrator(n8nWebhookUrl);
+        
+        // Set resume URL if provided in request
+        if (req.body.resumeUrl) {
+          orchestrator.setResumeUrl(req.body.resumeUrl);
+          console.log(`🔗 Resume URL set: ${req.body.resumeUrl}`);
+        }
+        
         await orchestrator.initialize();
         
         scrapingStatus.progress = 5;
@@ -336,6 +343,63 @@ app.get('/test/n8n', async (req, res) => {
   }
 });
 
+// Store prices from N8N
+app.post('/api/prices/store', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+    
+    console.log(`📥 Received ${items.length} price items from N8N`);
+    
+    // Validate items
+    const validItems = items.filter(item => 
+      item.domain && item.product_name && item.price && item.currency
+    );
+    
+    if (validItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid price items provided'
+      });
+    }
+    
+    console.log(`✅ Validated ${validItems.length} items, storing...`);
+    
+    // Store to memory for dashboard
+    validItems.forEach((item, index) => {
+      console.log(`${index + 1}. ${item.domain} - ${item.product_name}: ${item.price} ${item.currency}`);
+      
+      // Add to stored prices
+      storedPrices.push({
+        title: item.product_name,
+        price: `${item.price} ${item.currency}`,
+        currency: item.currency,
+        region: item.region || 'TR',
+        url: item.url,
+        siteName: item.domain,
+        gameSlug: 'unknown',
+        scraped_at: item.batch_timestamp || new Date().toISOString()
+      });
+    });
+    
+    // Also update dashboard items
+    dashboardItems = [...storedPrices];
+    
+    return res.json({
+      success: true,
+      message: 'Price items stored successfully',
+      stored: validItems.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error storing price items:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Get latest prices
 app.get('/api/prices/latest', async (req, res) => {
   try {
@@ -425,6 +489,7 @@ app.get('/config/rate-limit', (req, res) => {
 
 // Store scraped items for dashboard
 let dashboardItems: any[] = [];
+let storedPrices: any[] = []; // N8N'den gelen price items
 
 // Modern dashboard endpoint
 app.get('/api/dashboard/items', (req, res) => {

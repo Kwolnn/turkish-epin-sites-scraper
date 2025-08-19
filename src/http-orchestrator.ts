@@ -15,6 +15,7 @@ export class HttpOrchestrator {
   private domainDelay: number = Number(process.env.SCRAPER_DOMAIN_DELAY) || 0; // No domain delay - use batch timing instead
   private maxExecutionTime: number = Number(process.env.MAX_EXECUTION_TIME) || 3600000; // 1 hour max execution
   private startTime: number = 0;
+  private resumeUrl: string | null = null;
 
   constructor(n8nWebhookUrl: string) {
     this.n8nClient = new N8NClient(n8nWebhookUrl);
@@ -156,13 +157,18 @@ export class HttpOrchestrator {
     // Print summary
     this.printBatchSummary(batchResult);
 
-    // Send to N8N
+    // Send to N8N with HTTP request to resume URL
     if (batchResult.totalItems > 0) {
       console.log('\n📤 Sending data to N8N...');
       this.n8nClient.sendBatchData(batchResult).then(success => {
         if (!success) {
           console.error('❌ Failed to send data to N8N');
         }
+      });
+      
+      // Also send HTTP request to resume waiting workflow
+      this.sendResumeRequest(batchResult).catch(error => {
+        console.error('❌ Failed to send resume request:', error);
       });
     } else {
       console.log('⚠️ No items scraped, skipping N8N submission');
@@ -256,6 +262,59 @@ export class HttpOrchestrator {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  private async sendResumeRequest(batchResult: BatchResult): Promise<void> {
+    // Use provided resumeUrl or fallback to environment/default
+    const resumeUrl = this.resumeUrl || process.env.N8N_RESUME_URL || 'https://6879f79299af.ngrok-free.app/webhook-waiting/174';
+    
+    console.log(`📤 Resume URL provided: ${this.resumeUrl}`);
+    console.log(`📤 Resume URL from env: ${process.env.N8N_RESUME_URL}`);
+    console.log(`📤 Final resume URL: ${resumeUrl}`);
+    
+    try {
+      const axios = require('axios');
+      // Convert ScrapedItems to ScrapedPrices like N8N webhook
+      const prices: any[] = [];
+      
+      batchResult.results.forEach(result => {
+        if (result.success && result.items.length > 0) {
+          result.items.forEach(item => {
+            const { price, currency } = this.parsePrice(item.price);
+            
+            if (price > 0) {
+              prices.push({
+                price,
+                currency,
+                region: item.region,
+                product_name: item.title,
+                url: item.url,
+                batch_timestamp: batchResult.timestamp.toISOString()
+              });
+            }
+          });
+        }
+      });
+
+      await axios.post(resumeUrl, {
+        batchId: batchResult.batchId,
+        totalItems: batchResult.totalItems,
+        successCount: batchResult.successCount,
+        failedCount: batchResult.failedCount,
+        timestamp: batchResult.timestamp.toISOString(),
+        status: 'completed',
+        items: prices // Scraped items eklendi
+      }, {
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('✅ Resume request sent successfully');
+    } catch (error) {
+      console.error('❌ Resume request failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
   async close(): Promise<void> {
     console.log('🔒 HTTP orchestrator closed');
   }
@@ -304,5 +363,40 @@ export class HttpOrchestrator {
     }
     
     return status;
+  }
+
+  setResumeUrl(url: string): void {
+    this.resumeUrl = url;
+    console.log(`🔗 Resume URL set to: ${url}`);
+  }
+
+  private parsePrice(priceText: string): { price: number; currency: string } {
+    if (!priceText) return { price: 0, currency: 'TRY' };
+
+    // Remove whitespace and normalize
+    const cleaned = priceText.replace(/\s+/g, ' ').trim();
+    
+    // Common currency patterns
+    const patterns = [
+      { regex: /(\d+(?:[.,]\d+)?)\s*₺/g, currency: 'TRY' },
+      { regex: /₺\s*(\d+(?:[.,]\d+)?)/g, currency: 'TRY' },
+      { regex: /(\d+(?:[.,]\d+)?)\s*TL/gi, currency: 'TRY' },
+      { regex: /TL\s*(\d+(?:[.,]\d+)?)/gi, currency: 'TRY' },
+      { regex: /(\d+(?:[.,]\d+)?)\s*\$/g, currency: 'USD' },
+      { regex: /\$\s*(\d+(?:[.,]\d+)?)/g, currency: 'USD' },
+      { regex: /(\d+(?:[.,]\d+)?)\s*€/g, currency: 'EUR' },
+      { regex: /€\s*(\d+(?:[.,]\d+)?)/g, currency: 'EUR' },
+      { regex: /(\d+(?:[.,]\d+)?)/g, currency: 'TRY' } // Default fallback
+    ];
+
+    for (const pattern of patterns) {
+      const match = pattern.regex.exec(cleaned);
+      if (match && match[1]) {
+        const price = parseFloat(match[1].replace(',', '.'));
+        return { price, currency: pattern.currency };
+      }
+    }
+
+    return { price: 0, currency: 'TRY' };
   }
 }

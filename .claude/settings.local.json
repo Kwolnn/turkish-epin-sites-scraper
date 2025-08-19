@@ -10,7 +10,8 @@
       "WebFetch(domain:www.dijipin.com)",
       "WebFetch(domain:www.oyunfor.com)",
       "WebFetch(domain:www.oyunfor.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
