@@ -1,0 +1,317 @@
+{
+  "name": "Scrape Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        -352
+      ],
+      "id": "b947fb37-1f50-41e7-bf54-c0f9c76a1623",
+      "name": "Wait",
+      "webhookId": "f332732a-57a3-474e-ac12-ec472a296b75"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -352
+      ],
+      "id": "8cd0b9c3-8ed5-4fe4-95d1-d58b34501233",
+      "name": "30m"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ba7111e4-0648-43a0-89e5-e274b592fb09",
+              "name": "resumeUrl",
+              "value": "={{$execution.resumeUrl}}",
+              "type": "string"
+            },
+            {
+              "id": "2876378b-917a-451f-abad-8109f81dba52",
+              "name": "timestamp",
+              "value": "={{$now}}",
+              "type": "string"
+            },
+            {
+              "id": "79eed7d1-9047-4545-bee7-cce061aa9930",
+              "name": "jobType",
+              "value": "\"scraping\"",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        -352
+      ],
+      "id": "e8a0b283-5c78-471f-9265-4da3f3595643",
+      "name": "Resume Set"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gelen veriden items array'ini al\nconst rawItems = $json.body?.items || [];\n\nconst cleaned = rawItems\n  .map(x => ({\n    url: (x.url || '').trim(),\n    region: (x.region || '').trim().toUpperCase(),\n    product_name: (x.product_name || '').trim(),\n    currency: (x.currency || 'TRY').trim().toUpperCase(),\n    price: Number(x.price),\n    batch_timestamp: x.batch_timestamp\n      ? new Date(x.batch_timestamp).toISOString()\n      : new Date().toISOString()\n  }))\n  // Boş veya hatalı olanları filtrele\n  .filter(x =>\n    x.url &&\n    x.region &&\n    x.product_name &&\n    Number.isFinite(x.price) &&\n    x.price > 0\n  )\n  // Key ekle (URL + region)\n  .map(x => ({ ...x, _key: `${x.url}|${x.region}` }));\n\nreturn [{ json: { items: cleaned } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -352
+      ],
+      "id": "a44050b3-3115-4558-b618-a28f190054f7",
+      "name": "Regex"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend_app:3000/api/prices/store",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -352
+      ],
+      "id": "563f8f0e-b9d6-430f-bb5a-0553e0d5a187",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inp AS (\n  SELECT\n    $1::text  AS url,\n    $2::text  AS region,\n    $3::text  AS domain,\n    $4::text  AS product_name,\n    $5::text  AS price_raw,      -- price daima TEXT gelir\n    $6::text  AS currency,\n    $7::text  AS batch_raw       -- <-- ÖNEMLİ: artık TEXT!\n),\n\n-- price temizleme\nnorm_price AS (\n  SELECT i.*,\n         regexp_replace(price_raw, '[^0-9.,-]', '', 'g') AS s\n  FROM inp i\n),\ncanon AS (\n  SELECT n.*,\n         CASE\n           WHEN s LIKE '%.%' AND s LIKE '%,%' THEN replace(replace(s, '.', ''), ',', '.')\n           WHEN s LIKE '%,%'                   THEN replace(s, ',', '.')\n           ELSE s\n         END AS s2\n  FROM norm_price n\n),\n\n-- geçerli sayı mı?\nvalid_price AS (\n  SELECT c.*,\n         CASE WHEN s2 ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN s2::numeric ELSE NULL END AS price_num\n  FROM canon c\n),\n\n-- timestamp güvenli parse\nvalid_ts AS (\n  SELECT vp.*,\n         CASE\n           -- ISO 8601 / \"YYYY-MM-DD HH:MM:SS\" benzeri\n           WHEN batch_raw ~ '^\\d{4}-\\d{2}-\\d{2}([T ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?([Zz]|[+\\-]\\d{2}:\\d{2})?)?$'\n             THEN (CASE\n                     WHEN batch_raw ~ '^\\d{4}-\\d{2}-\\d{2}$'\n                       THEN (batch_raw || ' 00:00:00')::timestamptz\n                     ELSE batch_raw::timestamptz\n                   END)\n           ELSE now()   -- geçersizse now()\n         END AS batch_ts\n  FROM valid_price vp\n),\n\nlast AS (\n  SELECT p.price AS prev_price\n  FROM prices p\n  JOIN valid_ts v ON v.url = p.url AND v.region = p.region\n  ORDER BY p.batch_timestamp DESC\n  LIMIT 1\n),\n\nins AS (\n  INSERT INTO prices (domain, product_name, price, currency, region, url, batch_timestamp)\n  SELECT v.domain, v.product_name, v.price_num, v.currency, v.region, v.url, v.batch_ts\n  FROM valid_ts v\n  WHERE v.price_num IS NOT NULL\n    AND (SELECT prev_price FROM last) IS DISTINCT FROM v.price_num\n  RETURNING id, domain, product_name, price, currency, region, url, batch_timestamp\n)\n\nSELECT * FROM ins;\n",
+        "options": {
+          "queryReplacement": "={{ $json.url }},{{ $json.region }},{{ $json.domain }},{{ $json.product_name }},{{ $json.price }},{{ $json.currency }},{{ $json.batch_timestamp }}\n"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        992,
+        -352
+      ],
+      "id": "c298bbb0-085f-4f71-b166-2b43c532c6e1",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": false,
+      "credentials": {
+        "postgres": {
+          "id": "dFry4jjxtD6u1bPk",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------- Helpers ----------\nfunction sanitizeUrl(u) {\n  if (!u) return '';\n  let s = String(u).trim().replace(/\\s+/g, '');\n  // \"https:////\" gibi anomalileri toparla\n  s = s.replace(/^https?:\\/+/, m => m.toLowerCase().startsWith('https') ? 'https://' : 'http://');\n  if (!/^https?:\\/\\//i.test(s)) s = 'https://' + s;\n  return s;\n}\n\nfunction hostnameFrom(url) {\n  const clean = sanitizeUrl(url);\n  try { return new URL(clean).hostname; }\n  catch {\n    const m = clean.match(/^https?:\\/\\/([^\\/?#]+)/i);\n    return m ? m[1] : '';\n  }\n}\n\nfunction brandFromHost(host) {\n  if (!host) return '';\n  let h = host.replace(/^www\\./i, '').toLowerCase();\n  const multi = ['com.tr','gov.tr','edu.tr','org.tr','net.tr','com.az','com.sa','co.uk'];\n  for (const tld of multi) {\n    if (h.endsWith('.' + tld)) {\n      const parts = h.split('.');\n      const brand = parts[parts.length - (tld.split('.').length + 1)];\n      return brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';\n    }\n  }\n  const brand = h.split('.')[0];\n  return brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '';\n}\n\n// \"289,90 TL\", \"1.234,56\", \"1,234.56\", \"000 NC + 1\" gibi formatları temiz/parse eder\nfunction parsePrice(val) {\n  if (val === null || val === undefined) return NaN;\n  let s = String(val).trim();\n  s = s.replace(/[^\\d.,-]/g, '');         // sadece sayı, nokta, virgül, - bırak\n  if (s.includes('.') && s.includes(',')) {\n    s = s.replace(/\\./g, '').replace(',', '.'); // . binlik, , ondalık\n  } else if (s.includes(',')) {\n    s = s.replace(',', '.');\n  }\n  s = s.replace(/^(-?)0+(?=\\d)/, '$1');   // baştaki gereksiz 0'lar\n  const num = parseFloat(s);\n  return Number.isFinite(num) ? num : NaN;\n}\n\n// ---------- Input normalizasyonu ----------\nconst allInputs = $input.all();\nconst collected = [];\n\nfor (const rec of allInputs) {\n  // Tek obje ya da {items:[...]} dizisi olabilir\n  const candidate = rec.json?.items ?? rec.json ?? {};\n  const list = Array.isArray(candidate) ? candidate : [candidate];\n\n  for (const itRaw of list) {\n    if (!itRaw || typeof itRaw !== 'object') continue;\n\n    const url = String(itRaw.url || '').trim();\n    const host = hostnameFrom(url);\n    const domain = itRaw.domain ? String(itRaw.domain).trim() : brandFromHost(host);\n\n    const priceNum = parsePrice(itRaw.price);\n\n    const obj = {\n      domain,                                                    // $1\n      product_name: String(itRaw.product_name || '').trim(),     // $2\n      price: priceNum,                                           // $3\n      currency: String(itRaw.currency || 'TRY').trim().toUpperCase(), // $4\n      region: String(itRaw.region || 'TR').trim().toUpperCase(), // $5\n      url: sanitizeUrl(url) || null,                             // $6\n      batch_timestamp: itRaw.batch_timestamp\n        ? new Date(itRaw.batch_timestamp).toISOString()\n        : new Date().toISOString(),                              // $7\n    };\n\n    // Zorunlu alan ve sayısal kontrol\n    if (obj.domain && obj.product_name && obj.url && obj.region &&\n        Number.isFinite(obj.price) && obj.price > 0) {\n      collected.push({ json: obj });\n    }\n  }\n}\n\n// Her ürün ayrı item olarak dön\nreturn collected;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -352
+      ],
+      "id": "c22c96fd-a551-43de-88fb-cecc2cae6b7a",
+      "name": "Domain"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fake veri seti\nconst fakeData = [\n  {\n    url: \"https://www.gamesatis.com/mobile-legends-elmas-testr\",\n    product_name: \"test Elmas\",\n    price: \"2039,42\",\n    currency: \"TRY\",\n    region: \"TR\",\n    batch_timestamp: new Date().toISOString()\n  },\n  {\n    url: \"https://www.gamesatis.com/pubg-mobile-uc\",\n    product_name: \"test C\",\n    price: \"333,423.50\",\n    currency: \"TRY\",\n    region: \"TR\",\n    batch_timestamp: new Date().toISOString()\n  }\n];\n\n// HTTP Request node'un döndürdüğü format gibi items dizisi döndür\nreturn fakeData.map(item => ({ json: item }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -160
+      ],
+      "id": "6bd35206-6f57-4c6c-9348-41f7493a5338",
+      "name": "Code1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Postgres gerçek satır döndürdüyse 'id' vardır.\nconst rows = $input.all();\nconst out = rows.filter(i => i.json && i.json.id);\nreturn out;        // hi̇ç kayıt yoksa [] döner ve akış durur\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -352
+      ],
+      "id": "5b1c3bef-acc1-4a1a-9210-e2d48d00e4c8",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:3000/scrape/start",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"trigger_source\": \"n8n_schedule\",\n  \"timestamp\": \"={{ $json.timestamp }}\",\n  \"resumeUrl\": \"={{ $json.resumeUrl }}\",\n  \"scheduled\": true\n}\n",
+        "options": {
+          "timeout": 2000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -352
+      ],
+      "id": "83fdd399-1610-43fd-9546-831d5ef59c70",
+      "name": "Backend:3000"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Regex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "30m": {
+      "main": [
+        [
+          {
+            "node": "Resume Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Set": {
+      "main": [
+        [
+          {
+            "node": "Backend:3000",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regex": {
+      "main": [
+        [
+          {
+            "node": "Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Domain": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend:3000": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c51cc415-8c6e-4596-8fd6-45ca469d6e97",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "35f4d440193ce0810f5c267a3f393138b7876b76e8e5f29ce4c93f94361e37dd"
+  },
+  "id": "kiN3rVcnshOp4Q61",
+  "tags": []
+}
